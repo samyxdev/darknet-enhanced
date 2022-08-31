@@ -602,6 +602,10 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
         draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
+
+        // Affiche les mesures (fonction perso)
+        draw_anticollision_data(im, dets, nboxes, alphabet, what_time_is_it_now()); 
+
         free_detections(dets, nboxes);
         if(outfile){
             save_image(im, outfile);

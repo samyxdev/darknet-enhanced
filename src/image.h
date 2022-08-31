@@ -9,6 +9,8 @@
 #include "box.h"
 #include "darknet.h"
 
+#include "distfuncs_sam.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -60,6 +62,10 @@ image make_empty_image(int w, int h, int c);
 void copy_image_into(image src, image dest);
 
 image get_image_layer(image m, int l);
+
+// Fonctions perso
+void draw_anticollision_data(image im, detection *dets, int num, image **alphabet, double curr_time);
+void draw_marker(image im, float x, float y, float *rgb);
 
 #ifdef __cplusplus
 }

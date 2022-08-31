@@ -236,13 +236,31 @@ image **load_alphabet()
     return alphabets;
 }
 
+void draw_marker(image im, float x, float y, float *rgb)
+{
+    int i,j,k;
+    for(i=-5; i < 5; i++){
+        for(j=-5; j < 5; j++){
+            for(k=0; k < 3; k++)
+                set_pixel(im, x * im.w + i, y * im.h + j, k, rgb[k]);
+        }
+    }
+}
+
 void draw_detections(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes)
 {
     int i,j;
+    int mostctr_ind = get_mostctr_box(dets, num, thresh, classes);
 
     for(i = 0; i < num; ++i){
         char labelstr[4096] = {0};
         int class = -1;
+
+        // Affiche les index des box (pour se repérer)
+        char index_str[5] = {0};
+        sprintf(index_str, "%d: ", i);
+        strcat(labelstr, index_str);
+
         for(j = 0; j < classes; ++j){
             if (dets[i].prob[j] > thresh){
                 if (class < 0) {
@@ -272,6 +290,24 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
             float blue = get_color(0,offset,classes);
             float rgb[3];
 
+            // Personnalisation de cette box par rapport à la quelle on fait nos calculs
+            if(i == mostctr_ind)
+            {
+                strcat(labelstr, " - cible");
+                
+                // Même couleur que le texte ajouté
+                red = TARGET_RED;
+                green = TARGET_GREEN;
+                blue = TARGET_BLUE;
+            }
+
+            // Affichage des positions dans les labels
+            /*
+            char posBuff[25];
+            sprintf(posBuff, " BoxL:%f", dets[i].bbox.w*im.w);
+            strcat(labelstr, posBuff);
+            */
+            
             //width = prob*20+2;
 
             rgb[0] = red;
@@ -279,20 +315,26 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
             rgb[2] = blue;
             box b = dets[i].bbox;
             //printf("%f %f %f %f\n", b.x, b.y, b.w, b.h);
+            //printf("%f, %f, %f\n", red, green, blue);
 
             int left  = (b.x-b.w/2.)*im.w;
             int right = (b.x+b.w/2.)*im.w;
             int top   = (b.y-b.h/2.)*im.h;
             int bot   = (b.y+b.h/2.)*im.h;
 
+            //printf("%f %f %f %f\n", left, right, top, bot);
+
             if(left < 0) left = 0;
             if(right > im.w-1) right = im.w-1;
             if(top < 0) top = 0;
             if(bot > im.h-1) bot = im.h-1;
 
+            // Affiche un point au centre de chaque box
+            //draw_marker(im, b.x, b.y, rgb);
+
             draw_box_width(im, left, top, right, bot, width, red, green, blue);
             if (alphabet) {
-                image label = get_label(alphabet, labelstr, (im.h*.03));
+                image label = get_label(alphabet, labelstr, (im.h*.02));
                 draw_label(im, top + width, left, label, rgb);
                 free_image(label);
             }
@@ -309,19 +351,51 @@ void draw_detections(image im, detection *dets, int num, float thresh, char **na
     }
 }
 
-void transpose_image(image im)
+// Fonction perso affichant la distance et la vitesse relative calculée par la méthode expliquée
+void draw_anticollision_data(image im, detection *dets, int num, image **alphabet, double curr_time)
 {
-    assert(im.w == im.h);
-    int n, m;
-    int c;
-    for(c = 0; c < im.c; ++c){
-        for(n = 0; n < im.w-1; ++n){
-            for(m = n + 1; m < im.w; ++m){
-                float swap = im.data[m + im.w*(n + im.h*c)];
-                im.data[m + im.w*(n + im.h*c)] = im.data[n + im.w*(m + im.h*c)];
-                im.data[n + im.w*(m + im.h*c)] = swap;
-            }
-        }
+    int ctr_ind = get_mostctr_index();
+
+    // Taille de la box pour nos calculs de distance/vitesse
+    float box_w = dets[ctr_ind].bbox.w * im.w;
+
+    float calc_dist;
+
+    if (alphabet) {
+        char dist[20] = "Dist: ";
+        char vrel[20] = "V_rel: ";
+        char buff[20] = {0};
+
+        // Distance calculée en m
+        calc_dist = get_distance(box_w, 0);
+
+        //printf("Distance : %0.2f\n", calc_dist);
+
+        sprintf(buff, "%0.2f",  calc_dist);
+        strcat(dist, buff);
+        strcat(dist, " m");
+
+        sprintf(buff, "%0.2f", get_relspeed(box_w, curr_time, calc_dist, 0));
+        strcat(vrel, buff);
+        strcat(vrel, " m/s");
+
+        //printf("x:%f y:%f\n", dets[ctr_ind].bbox.x - dets[ctr_ind].bbox.w/2, dets[ctr_ind].bbox.y - dets[ctr_ind].bbox.h/2);
+
+        // Fixé dans distfuncs_sam.h
+        float rgb[3] = {TARGET_RED, TARGET_GREEN, TARGET_BLUE};
+
+        image dist_label = get_label(alphabet, dist, (im.h*.02));
+        image vrel_label = get_label(alphabet, vrel, (im.h*.02));
+
+        // Positions au format étrange de y,x
+        draw_label(im, 70, 50, dist_label, rgb);
+        draw_label(im, 75 + dist_label.h, 50, vrel_label, rgb);
+
+        // Affiche un point au centre de l'écran
+        //draw_marker(im, RATIO_CTR_X, RATIO_CTR_Y, rgb);
+
+        free_image(dist_label);
+        free_image(vrel_label);
     }
 }
 
